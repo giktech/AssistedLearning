@@ -6,8 +6,8 @@ import time
 import numpy as np
 import tensorflow as tf
 
-from root_module.implementation_module import L2LWS, DataReader
-from root_module.parameters_module import GlobalParams, ConfidenceNetworkParams, TargetNetworkParams, \
+from global_module.implementation_module import L2LWS, DataReader
+from global_module.settings_module import GlobalParams, ConfidenceNetworkParams, TargetNetworkParams, \
     Dictionary, Directory, ConfidenceNetworkDirectory, TargetNetworkDirectory
 
 
@@ -145,6 +145,7 @@ class Train:
 
 
             else:
+                # Debug: print(data_arr, gold_label_arr, weak_label_arr)
                 indiv_loss, total_loss, pred, prob, logits, cnf, rep, _ = session.run([net_obj.indiv_loss,
                                                                                        net_obj.mean_loss,
                                                                                        net_obj.prediction,
@@ -154,10 +155,20 @@ class Train:
                                                                                        model_obj.tar_rep,
                                                                                        model_obj.tar_train_op],
                                                                                       feed_dict=feed_dict)
+            # Debug: print(pred)
             for idx, each_pred in enumerate(pred):
                 if each_pred == gold_label_arr[idx]:
                 # if each_pred == weak_label_arr[idx]:
                     correct += 1.0
+            
+            ypred=0.0
+            ypredrecall=0.0
+            for idx, each_pred in enumerate(pred):
+                if gold_label_arr[idx]:
+                    ypred += 1.0
+                if each_pred == gold_label_arr[idx] and each_pred:
+                # if each_pred == weak_label_arr[idx]:
+                    ypredrecall += 1.0
 
             total += params.batch_size
             # print('Debug: Total, Correct ', total, correct)
@@ -166,6 +177,9 @@ class Train:
 
         if total > 0:
             print('tar network accuracy: %.4f' % (correct / total))
+        if ypred > 0:
+            print('tar network recall: %.4f' % (ypredrecall/ypred))
+            
         print ('Epoch Num: %d, tar loss: %.4f' % (epoch_num + 1, epoch_combined_loss))
 
         if params.mode == 'VA':
@@ -338,34 +352,34 @@ class Train:
                         print("Loading model from: %s" % ckpt.model_checkpoint_path)
                         tf.train.Saver().restore(session, ckpt.model_checkpoint_path)
 
-                    lr_decay = tar_params_train.lr_decay ** max(i - global_params.max_epoch, 0.0)
-                    train_obj.cnf_network.assign_lr(session, cnf_params_train.learning_rate * lr_decay)
-                    train_obj.tar_network.assign_lr(session, cnf_params_train.learning_rate * lr_decay)
+                lr_decay = tar_params_train.lr_decay ** max(i - global_params.max_epoch, 0.0)
+                train_obj.cnf_network.assign_lr(session, cnf_params_train.learning_rate * lr_decay)
+                train_obj.tar_network.assign_lr(session, cnf_params_train.learning_rate * lr_decay)
 
-                    print("Epoch: %d Learning rate: %.5f" % (i + 1, session.run(train_obj.tar_network.lr)))
-                    train_loss, _ = self.run_tar_net_epoch(tar_train_writer, session, tar_min_loss, train_obj, dict_obj, i)
-                    print("TGT NETWORK: Epoch: %d Train loss: %.3f\n" % (i + 1, train_loss))
+                print("Epoch: %d Learning rate: %.5f" % (i + 1, session.run(train_obj.tar_network.lr)))
+                train_loss, _ = self.run_tar_net_epoch(tar_train_writer, session, tar_min_loss, train_obj, dict_obj, i)
+                print("TGT NETWORK: Epoch: %d Train loss: %.3f\n" % (i + 1, train_loss))
 
-                    valid_obj.cnf_network.assign_lr(session, cnf_params_train.learning_rate * lr_decay)
-                    valid_obj.tar_network.assign_lr(session, cnf_params_train.learning_rate * lr_decay)
+                valid_obj.cnf_network.assign_lr(session, cnf_params_train.learning_rate * lr_decay)
+                valid_obj.tar_network.assign_lr(session, cnf_params_train.learning_rate * lr_decay)
 
-                    valid_loss, curr_loss = self.run_tar_net_epoch(tar_valid_writer, session, tar_min_loss, valid_obj, dict_obj, i)
-                    if curr_loss < tar_min_loss:
-                        tar_min_loss = curr_loss
+                valid_loss, curr_loss = self.run_tar_net_epoch(tar_valid_writer, session, tar_min_loss, valid_obj, dict_obj, i)
+                if curr_loss < tar_min_loss:
+                    tar_min_loss = curr_loss
 
-                    print("TGT: Epoch: %d Valid loss: %.3f" % (i + 1, valid_loss))
+                print("TGT: Epoch: %d Valid loss: %.3f" % (i + 1, valid_loss))
 
-                    curr_time = time.time()
-                    print('1 TGT epoch run takes ' + str(((curr_time - start_time) / (i + 1)) / 60) + ' minutes.')
+                curr_time = time.time()
+                print('1 TGT epoch run takes ' + str(((curr_time - start_time) / (i + 1)) / 60) + ' minutes.')
 
-                    print('\nFinishing TGT epoch: \n', i+1)
+                print('\nFinishing TGT epoch: \n', i+1)
 
             cnf_train_writer.close()
             cnf_valid_writer.close()
             tar_train_writer.close()
             tar_valid_writer.close()
 
-def run_test(self, dict_obj):
+    def run_test(self, dict_obj):
     
         tf.set_random_seed(42)
         mode_train, mode_valid, mode_test = 'TR', 'VA', 'TE'
@@ -446,7 +460,7 @@ def run_test(self, dict_obj):
 
                 print('\n Starting CNF Epoch: \n', i+1)
 
-                if i > 0:
+                if i >= 0:
                     ckpt = tf.train.get_checkpoint_state(global_dir.model_path)
                     if ckpt and ckpt.model_checkpoint_path:
                         print("Checkpoint during the Epoch: Loading model from: %s" % ckpt.model_checkpoint_path)
@@ -475,19 +489,19 @@ def run_test(self, dict_obj):
                         print("Loading model from: %s" % ckpt.model_checkpoint_path)
                         tf.train.Saver().restore(session, ckpt.model_checkpoint_path)
 
-                    # lr_decay = tar_params_train.lr_decay ** max(i - global_params.max_epoch, 0.0)
-                    # train_obj.cnf_network.assign_lr(session, cnf_params_train.learning_rate * lr_decay)
-                    # train_obj.tar_network.assign_lr(session, cnf_params_train.learning_rate * lr_decay)
+                # lr_decay = tar_params_train.lr_decay ** max(i - global_params.max_epoch, 0.0)
+                # train_obj.cnf_network.assign_lr(session, cnf_params_train.learning_rate * lr_decay)
+                # train_obj.tar_network.assign_lr(session, cnf_params_train.learning_rate * lr_decay)
 
-                    # print("Epoch: %d Learning rate: %.5f" % (i + 1, session.run(train_obj.tar_network.lr)))
-                    test_loss, _ = self.run_tar_net_epoch(tar_test_writer, session, tar_min_loss, test_obj, dict_obj, i)
-                    print("TGT NETWORK: Epoch: %d Test loss: %.3f\n" % (i + 1, test_loss))
+                # print("Epoch: %d Learning rate: %.5f" % (i + 1, session.run(train_obj.tar_network.lr)))
+                test_loss, _ = self.run_tar_net_epoch(tar_test_writer, session, tar_min_loss, test_obj, dict_obj, i)
+                print("TGT NETWORK: Epoch: %d Test loss: %.3f\n" % (i + 1, test_loss))
 
-         
-                    curr_time = time.time()
-                    print('1 TGT epoch run takes ' + str(((curr_time - start_time) / (i + 1)) / 60) + ' minutes.')
 
-                    print('\nFinishing TGT epoch: \n', i+1)
+                curr_time = time.time()
+                print('1 TGT epoch run takes ' + str(((curr_time - start_time) / (i + 1)) / 60) + ' minutes.')
+
+                print('\nFinishing TGT epoch: \n', i+1)
 
             cnf_test_writer.close()
             tar_test_writer.close()
@@ -496,8 +510,7 @@ def run_test(self, dict_obj):
             
 def main():
     dict_obj = Dictionary()
-    # Train().run_train(dict_obj)
-    Train().run_test(dict_obj)
+    Train().run_train(dict_obj)
 
 
 if __name__ == "__main__":

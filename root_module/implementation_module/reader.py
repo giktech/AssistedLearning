@@ -50,8 +50,8 @@ class DataReader:
         data_file_arr = open(data_filename, 'r').readlines()       
         glabel_file_arri = open(gold_label_filename, 'r').readlines()
         wlabel_file_arri = open(weak_label_filename, 'r').readlines()
-        glabel_file_arr = [ "1" if (item == 'Yes') else "0" for item in glabel_file_arri ]
-        wlabel_file_arr = [ "0" + "\t" + "1" if (item == 'Yes') else "1" + "\t" + "0" for item in wlabel_file_arri ]
+        glabel_file_arr = [ "1" if (item.strip() == 'Yes') else "0" for item in glabel_file_arri ]
+        wlabel_file_arr = [ "0" + "\t" + "1" if (item.strip() == 'Yes') else "1" + "\t" + "0" for item in wlabel_file_arri ]
         
         global_data_arr = []
         global_glabel_arr = []
@@ -82,7 +82,7 @@ class DataReader:
         data_file_arr = open(data_filename, 'r').readlines()
         wlabel_file_arri = open(weak_label_filename, 'r').readlines()
         # wlabel_file_arr = [ "1" if (item == 'Yes') else "0" for item in wlabel_file_arri ]
-        wlabel_file_arr = [ "0" + "\t" + "1" if (item == 'Yes') else "1" + "\t" + "0" for item in wlabel_file_arri ]
+        wlabel_file_arr = [ "0" + "\t" + "1" if (item.strip() == 'Yes') else "1" + "\t" + "0" for item in wlabel_file_arri ]
         
         global_data_arr = []
         global_wlabel_arr = []
@@ -154,6 +154,15 @@ class DataReader:
 
         batch_size = self.params.batch_size
         num_batches = len(index_arr) / self.params.batch_size
+        
+        # Check for ratio of "Requests"
+        county=0
+        total=0
+        for i in gold_label_arr:
+            if i:
+                county +=1
+            total+=1
+        print('Ratio of requests in tar_input', county/total)
 
         if self.params.mode == 'TR':
             num_batches = int(math.ceil(0.5 * num_batches))
